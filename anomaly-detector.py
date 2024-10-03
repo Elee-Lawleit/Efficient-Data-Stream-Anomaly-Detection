@@ -17,6 +17,7 @@ class DataStreamSimulator:
         self.time_index = 0
         
     # this function generates the baseline value based on the seasonal pattern
+    # this can be further expanded to include other seasonal patterns
     def _generate_baseline(self):
         """Generate baseline value based on seasonal pattern"""
         if self.seasonal_pattern == 'daily':
@@ -28,23 +29,28 @@ class DataStreamSimulator:
     # emulates a real time data stream, occasionally returning anomalies
     def get_next_value(self):
         """Generate next value in the stream"""
-        baseline = self._generate_baseline()
-        noise = np.random.normal(0, self.noise_level)
-        
-        # Occasionally inject anomalies (1% chance)
-        # could change this to not create spikes for the first hundred values because that affects the mean value a bit
-        # which causes less anomalies to occur, because the mean is affected if there are spikes in historical data
-        if np.random.random() < 0.01:
-            anomaly = np.random.choice([
-                baseline * 3,  # Spike
-                baseline * 0.1,  # Drop
-                baseline + np.random.normal(0, baseline)  # Random deviation
-            ])
+        try:
+            baseline = self._generate_baseline()
+            noise = np.random.normal(0, self.noise_level)
+            
+            # Occasionally inject anomalies (1% chance)
+            # could change this to not create spikes for the first hundred values because that affects the mean value a bit
+            # which causes less anomalies to occur, because the mean is affected if there are spikes in historical data
+            if np.random.random() < 0.01:
+                anomaly = np.random.choice([
+                    baseline * 3,  # Spike
+                    baseline * 0.1,  # Drop
+                    baseline + np.random.normal(0, baseline)  # Random deviation
+                ])
+                self.time_index += 1
+                return anomaly
+            
             self.time_index += 1
-            return anomaly
-        
-        self.time_index += 1
-        return baseline + noise
+            return baseline + noise
+        except Exception as e:
+            print(f"Error generating data: {e}")
+            return None
+
 
 class AnomalyDetector:
     """Detects anomalies in real-time data stream"""
@@ -62,28 +68,35 @@ class AnomalyDetector:
     # this function updates the average along with the standard deviation
     def update_stats(self, value):
         """Update EWMA statistics with new value"""
-        if self.ewma is None:
-            self.ewma = value
-            self.ewma_std = 0
-        else:
-            # Update EWMA
-            self.ewma = self.alpha * value + (1 - self.alpha) * self.ewma
-            
-            # Update EWMA of squared deviations
-            deviation = abs(value - self.ewma)
-            self.ewma_std = self.alpha * deviation + (1 - self.alpha) * self.ewma_std
+        try:
+            if self.ewma is None:
+                self.ewma = value
+                self.ewma_std = 0
+            else:
+                # Update EWMA
+                self.ewma = self.alpha * value + (1 - self.alpha) * self.ewma
+                
+                # Update EWMA of squared deviations
+                deviation = abs(value - self.ewma)
+                self.ewma_std = self.alpha * deviation + (1 - self.alpha) * self.ewma_std
+        except Exception as e:
+            print(f"Error updating stats: {e}")
     
     def is_anomaly(self, value):
         """Determine if a value is anomalous"""
-        self.values.append(value) # storing historical data
-        self.update_stats(value)
-        
-        if len(self.values) < self.window_size:
+        try:
+            self.values.append(value) # storing historical data
+            self.update_stats(value)
+            
+            if len(self.values) < self.window_size:
+                return False
+            
+            # Check if value deviates significantly from EWMA
+            z_score = abs(value - self.ewma) / (self.ewma_std + 1e-10)
+            return z_score > self.threshold
+        except Exception as e:
+            print(f"Error detecting anomaly: {e}")
             return False
-        
-        # Check if value deviates significantly from EWMA
-        z_score = abs(value - self.ewma) / (self.ewma_std + 1e-10)
-        return z_score > self.threshold
 
 
 # this class helps visualize the data stream and the anomalies using matplotlib
@@ -110,23 +123,27 @@ class StreamVisualizer:
         
     def update(self, timestamp, value, is_anomaly):
         """Update visualization with new data point"""
-        self.timestamps.append(timestamp)
-        self.values.append(value)
-        
-        if is_anomaly:
-            self.anomalies_x.append(timestamp)
-            self.anomalies_y.append(value)
-        
-        # Update plot
-        self.line.set_data(list(self.timestamps), list(self.values))
-        self.anomaly_scatter.set_offsets(np.c_[list(self.anomalies_x), 
-                                             list(self.anomalies_y)])
-        
-        # Adjust plot limits
-        self.ax.relim()
-        self.ax.autoscale_view()
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events() 
+        try:
+            self.timestamps.append(timestamp)
+            self.values.append(value)
+            
+            if is_anomaly:
+                self.anomalies_x.append(timestamp)
+                self.anomalies_y.append(value)
+            
+            # Update plot
+            self.line.set_data(list(self.timestamps), list(self.values))
+            self.anomaly_scatter.set_offsets(np.c_[list(self.anomalies_x), 
+                                                 list(self.anomalies_y)])
+            
+            # Adjust plot limits
+            self.ax.relim()
+            self.ax.autoscale_view()
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+        except Exception as e:
+            print(f"Error updating visualization: {e}")
+
 
 def main():
     """Main function to run the anomaly detection system"""
@@ -140,6 +157,10 @@ def main():
         while True:
             # Generate new value
             value = simulator.get_next_value()
+            
+            if value is None:  # If there was an error in generating the value, skip the iteration
+                continue
+                
             timestamp = datetime.now()
             
             # Detect anomalies
@@ -154,7 +175,9 @@ def main():
     except KeyboardInterrupt:
         print("Stopping data stream...")
         plt.close()
+    except Exception as e:
+        print(f"Error in main loop: {e}")
+        plt.close()
 
 if __name__ == "__main__":
     main()
-

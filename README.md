@@ -99,7 +99,7 @@ The project is implemented using Python 3.x and the following libraries:
 4. **Window Size and Threshold:**
    The anomaly detection threshold (Z-score threshold) and the sliding window size were tuned to balance sensitivity and specificity, ensuring the system effectively captures significant deviations while avoiding false positives for this small scale script.
 5. **Spikes and Drops in the first 100 values:**
-   To simulate the passage of time and the impact of seasonal patterns, the script injects spikes and drops in the first 100 values. This can be changed to not include spikes in the first 100 values, which can affect the mean value and reduce the number of anomalies.
+   To simulate the passage of time and the impact of seasonal patterns, the script injects spikes and drops in the first 100 values. This can be changed to not include spikes in the first 100 values, which can affect the mean value and possibly reduce the number of anomalies for simulation purposes.
 
 ## Limitations and Future Work
 
